@@ -1,12 +1,14 @@
 #! ./py3env/bin/python3.7
+import time
+import logging
+import signal
 import os
 import argparse
 import requests
 from pprint import pprint
 from slackclient import SlackClient
-import signal
-import logging
-import time
+from dotenv import load_dotenv
+load_dotenv()
 """
 Slackbot Project
 """
@@ -17,16 +19,22 @@ SLACK_VERIFICATION_KEY = os.getenv("SLACK_VERIFICATION_KEY")
 SLACK_OAUTH_ACCESS_KEY = os.getenv("SLACK_OAUTH_ACCESS_KEY")
 SLACK_BOT_ACCESS_KEY = os.getenv("SLACK_BOT_ACCESS_KEY")
 BOT_ID = 'UF5QHDYCU'
-bot_mentioned_string = f'<@{BOT_ID}>'
+BOT_MENTIONED_STRING = f'<@{BOT_ID}>'
 sc = SlackClient(SLACK_BOT_ACCESS_KEY)
+exit_flag = False
 
 
-def post_message(general_channel, text):
-    sc.api_call(
-        "chat.postMessage",
-        general_channel=general_channel,
-        text=text
-    )
+def post_message(channel, text):
+    try:
+        c = sc.api_call(
+            "chat.postMessage",
+            channel=channel,
+            text=text
+        )
+    except Exception as e:
+        logger.error('FAILED TO POST MESSAGE')
+    if 'error' in c.keys():
+        logger.error(c['error'])
 
 
 def create_logger():
@@ -34,19 +42,19 @@ def create_logger():
     Settup logger level and format
     """
     # create logger
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger('BobBot')
     logger.setLevel(logging.DEBUG)
     # create console handler and set level to debug
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    # create formatter
-    formatter = logging.Formatter(
-        '%(asctime)s  %(levelname)s:  %(message)s',
-        datefmt='%Y-%m-%d  %H:%M:%S')
-    # add formatter to ch
-    ch.setFormatter(formatter)
-    # add ch to logger
-    logger.addHandler(ch)
+    # ch = logging.StreamHandler()
+    # ch.setLevel(logging.DEBUG)
+    # # create formatter
+    # formatter = logging.Formatter(
+    #     '%(asctime)s  %(levelname)s:  %(message)s',
+    #     datefmt='%Y-%m-%d  %H:%M:%S')
+    # # add formatter to ch
+    # ch.setFormatter(formatter)
+    # # add ch to logger
+    # logger.addHandler(ch)
 
     return logger
 
@@ -64,14 +72,16 @@ def signal_handler(sig_num, frame):
         signal.__dict__.items()))
         if v.startswith('SIG') and not v.startswith('SIG_'))
     logger.warning(
-        '\nReceived {}\n\nShutting Down...'.format(signames[sig_num]))
+        '\nReceived {}\n\n'.format(signames[sig_num]))
+
     sc.server.connected = False
 
 
 def main():
+    global exit_flag
 
     # command to listen to on slack to indicate bot is exiting
-    exit_command = f'{bot_mentioned_string} exit'
+    exit_command = f'{BOT_MENTIONED_STRING} exit'
 
     # slack channel IDs
     general_channel = 'CCD7MHJD8'
@@ -80,29 +90,30 @@ def main():
         while sc.server.connected is True:
             # continuously monitor slack events for mentions of this bot
             # if exit message is received then exit gracefully
-            event = sc.rtm_read()
-            if type(event) is list and event != [] and 'message' in event[0].values() and BOT_ID in event[0]['text']:
-                if event[0]['text'].strip() == exit_command:
-                    print('Exit message received...')
-                    exit_flag = True
-                else:
-                    # replace mention tag with bot name and log
-                    msg = event[0]['text'].replace(
-                        '<@UF5QHDYCU>', '@Bobbot')
-                    logger.info('Bot was mentioned!')
-                    logger.info(msg)
+            events = sc.rtm_read()
+            for event in events:
+                if 'message' in event.values() and BOT_ID in event['text']:
+                    if event['text'].strip() == exit_command:
+                        print('Exit message received...')
+                        sc.server.connected = False
+                    else:
 
-                    # send response message in chat
-                    post_message(general_channel, "Who wants Ramen?")
+                        # replace mention tag with bot name and log
+                        msg = event['text'].replace(
+                            BOT_MENTIONED_STRING, '@Bobbot')
+                        logger.info(f'Bot was mentioned!\n{msg}')
+
+                        # send response message in chat
+                        post_message(general_channel,
+                                     "Who wants Ramen or Ramlets?")
             time.sleep(1)
     else:
-        print ("Connection Failed")
+        logger.error("Connection Failed")
 
 
 if __name__ == "__main__":
     """ This is executed when run from the command line """
-    global exit_flag
-    exit_flag = False
+
     # setup signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -111,9 +122,9 @@ if __name__ == "__main__":
     logger = create_logger()
 
     # keep bot open until we close it
-    while not exit_flag:
-        main()
+
+    main()
 
     # exit gracefully
     logger.info('Shutting Down...')
-    exit()
+    exit(1)
