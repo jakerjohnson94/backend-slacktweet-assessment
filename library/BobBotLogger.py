@@ -3,7 +3,7 @@ import logging
 
 def create_logger():
     """
-    Settup logger level and format
+    Settup a logger with a stream handler and format for our bot logging
     """
     # create logger
     logger = logging.getLogger()
