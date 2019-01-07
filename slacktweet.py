@@ -4,15 +4,15 @@ import logging
 import signal
 import os
 import argparse
+import sys
 from pprint import pprint
 from slackclient import SlackClient
 from dotenv import load_dotenv
 import tweepy
-
-from library.TweepyStreamListener import TweepyStreamListener
 from library.create_logger import create_logger
 from Bots.Slack import Slackbot
 from Bots.Twitter import Twitterbot
+
 """
 Slacktweet Project
 """
@@ -45,6 +45,7 @@ def signal_handler(sig_num, frame):
     global exit_flag
     global logger
     global slackbot
+    global twitterbot
     """
     This is a handler for SIGTERM and SIGINT. Other signals can be mapped
     here as well
@@ -56,15 +57,16 @@ def signal_handler(sig_num, frame):
         signal.__dict__.items()))
         if v.startswith('SIG') and not v.startswith('SIG_'))
 
-    set_exit_flag(slackbot)
     logger.warning(
         f'Received {signames[sig_num]}')
+    set_exit_flag(slackbot, twitterbot)
 
 
-def set_exit_flag(slackbot):
+def set_exit_flag(slackbot, tweetbot):
     global exit_flag
-    exit_flag = True
     slackbot.client.server.connected = False
+    tweetbot.logged_in = False
+    exit_flag = True
 
 
 def main(slackbot, twitterbot):
@@ -81,17 +83,20 @@ def main(slackbot, twitterbot):
 
     slackbot.connect_to_stream()
     twitterbot.login()
-    while not exit_flag:
-        # slackbot.monitor_stream()
-        twitterbot.monitor_stream()
-        time.sleep(1)
+
+    # async twitter stream monitor
+
+    twitterbot.monitor_stream()
+    time.sleep(60)
+
+    slackbot.monitor_stream()
 
     # exit gracefully
     logger.info('Shutting Down...')
-    twitterbot.stream.disconnect()
+
     logging.shutdown()
 
-    exit(0)
+    raise SystemExit
 
 
 if __name__ == "__main__":

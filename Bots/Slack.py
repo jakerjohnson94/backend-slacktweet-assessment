@@ -78,7 +78,7 @@ class Slackbot(object):
             except Exception as e:
                 self.error(f'Failed to Read Slack Events\n{e}')
             time.sleep(2)
-        self.info('exiting monitor_stream...')
+        self.info('Exiting Slack Stream...')
 
     def parse_events(self, events):
         general_channel = '#general'
@@ -112,7 +112,6 @@ class Slackbot(object):
         # command to listen to on slack to indicate bot is exiting
         try:
             res = self.client.rtm_connect()
-            assert res
             self.info(
                 'Successfully Connected to Slack Stream!')
         except:

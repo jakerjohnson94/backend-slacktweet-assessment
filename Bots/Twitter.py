@@ -1,25 +1,25 @@
 #! ./py3env/bin/python3.7
 import time
 import logging
-import signal
 import os
-import argparse
-import requests
-from pprint import pprint
-from slackclient import SlackClient
 from dotenv import load_dotenv
 import tweepy
+import sys
 
-from library.TweepyStreamListener import TweepyStreamListener
 from library.create_logger import create_logger
 # get enviornment variables
-load_dotenv()
-# twitter keys and variables
-TWITTER_CONSUMER_API_KEY = os.getenv('TWITTER_CONSUMER_API_KEY')
-TWITTER_CONSUMER_SECRET_API_KEY = os.getenv('TWITTER_CONSUMER_SECRET_API_KEY')
-TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
-TWITTER_ACCESS_SECRET_TOKEN = os.getenv('TWITTER_ACCESS_SECRET_TOKEN')
-BOT_TWITTER_HANDLE = 'BobBot2018'
+
+
+logger = create_logger('Twitterbot')
+
+
+class TwitterStreamListener(tweepy.StreamListener):
+    """
+    overwrite tweepystreamlistener to monitor our bot's twitter stream
+    """
+
+    def on_status(self, status):
+        logger.info(status.text)
 
 
 class Twitterbot(object):
@@ -35,7 +35,7 @@ class Twitterbot(object):
         self.secret_api_key = secret_api_key
         self.access_token = access_token
         self.secret_access_token = secret_access_token
-        self.logger = create_logger(__name__)
+        self.logger = logger
         self.logged_in = False
 
     def login(self):
@@ -58,11 +58,22 @@ class Twitterbot(object):
         """
         listen to twitter stream for messages containing the bot's twitter handle
         """
-        tweepyStreamListener = TweepyStreamListener()
-        self.logger.info('Monitoring Twitter Stream...')
-        try:
-            self.stream = tweepy.Stream(auth=self.api.auth,
-                                        listener=tweepyStreamListener)
-            # twitter_stream.filter(is_async=True)
-        except Exception as e:
-            self.logger.error(f'An error occured while monitoring the Twitter stream: {e}')
+
+        tweepyStreamListener = TwitterStreamListener()
+        self.logger.info('Connecting to Twitter stream...')
+
+        if self.logged_in == True:
+            try:
+                self.stream = tweepy.Stream(auth=self.api.auth,
+                                            listener=tweepyStreamListener)
+                self.logger.info('Connected to Twitter Stream.')
+            except Exception as e:
+                self.logger.error(f'Error Connecting to Twitter Stream.{e}')
+                time.sleep(10)
+            try:
+                self.stream.filter(track=[self.username], is_async=True)
+            except Exception as e:
+                self.logger.error(f'An error occured while monitoring the Twitter stream: {e}')
+                time.sleep(10)
+        else:
+            raise SystemExit
