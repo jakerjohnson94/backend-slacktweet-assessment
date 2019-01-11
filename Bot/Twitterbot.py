@@ -27,12 +27,20 @@ class Twitterbot(tweepy.StreamListener):
         self.access_token = access_token
         self.secret_access_token = secret_access_token
         self.logger = create_logger(__name__)
+        self.subscriptions = []
+        self.stream = None
 
     def on_status(self, status):
         self.logger.info(f'Twitter event: {status.text}')
+        return self.stream.running
 
     def on_disconnect(self, status):
         self.logger.error(f'Disconnected from Twitter Stream. {status}')
+
+    def add_subscription(self, slug):
+        self.subscriptions.append(slug)
+        self.logger.info('added {slug} to current Twitter subscriptions')
+        self.monitor_stream()
 
     def login(self):
         """
@@ -65,10 +73,5 @@ class Twitterbot(tweepy.StreamListener):
         self.logger.info('Connecting to Twitter stream...')
         self.stream = tweepy.Stream(auth=self.api.auth,
                                     listener=self)
-
         self.logger.info('Successfully Connected to Twitter Stream')
-        self.start_stream(track=[self.username], is_async=True)
-
-        # time.sleep(3)
-        # except Exception as e:
-        #     self.logger.error(f'Error Connecting to Twitter Stream.{e}')
+        self.start_stream(track=self.subscriptions, is_async=True)

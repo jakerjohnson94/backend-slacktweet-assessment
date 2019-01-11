@@ -67,7 +67,7 @@ def set_exit_flag(slackbot, tweetbot):
     global exit_flag
     exit_flag = True
     slackbot.client.server.connected = False
-    tweetbot.stream.disconnect()
+    tweetbot.stream.running = False
     tweetbot.api.update_status(f'@{tweetbot.username} {dt.now()} exiting...')
 
 
@@ -85,6 +85,7 @@ def main(slackbot, twitterbot):
 
     twitterbot.login()
     # async twitter stream monitor\
+    twitterbot.add_subscription('python')
     twitterbot.monitor_stream()
 
     slackbot.connect_to_stream()
