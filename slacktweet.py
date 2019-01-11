@@ -10,8 +10,9 @@ from slackclient import SlackClient
 from dotenv import load_dotenv
 import tweepy
 from library.create_logger import create_logger
-from Bots.Slack import Slackbot
-from Bots.Twitter import Twitterbot
+from Bot.Slackbot import Slackbot
+from Bot.Twitterbot import Twitterbot
+from datetime import datetime as dt
 
 """
 Slacktweet Project
@@ -35,7 +36,7 @@ SLACKBOT_ID = 'UF5QHDYCU'
 BOT_MENTIONED_STRING = f'<@{SLACKBOT_ID}>'
 
 # setup logger
-logger = create_logger('main')
+logger = create_logger(__name__)
 
 # set exit flag to start
 exit_flag = False
@@ -64,9 +65,10 @@ def signal_handler(sig_num, frame):
 
 def set_exit_flag(slackbot, tweetbot):
     global exit_flag
-    slackbot.client.server.connected = False
-    tweetbot.logged_in = False
     exit_flag = True
+    slackbot.client.server.connected = False
+    tweetbot.stream.disconnect()
+    tweetbot.api.update_status(f'@{tweetbot.username} {dt.now()} exiting...')
 
 
 def main(slackbot, twitterbot):
@@ -81,26 +83,22 @@ def main(slackbot, twitterbot):
                 'Starting Bobbot\n'
                 '----------------------------\n')
 
-    slackbot.connect_to_stream()
     twitterbot.login()
-
-    # async twitter stream monitor
-
+    # async twitter stream monitor\
     twitterbot.monitor_stream()
-    time.sleep(60)
 
+    slackbot.connect_to_stream()
     slackbot.monitor_stream()
 
     # exit gracefully
     logger.info('Shutting Down...')
-
     logging.shutdown()
-
     raise SystemExit
 
 
 if __name__ == "__main__":
     """ This is executed when run from the command line """
+
     # setup signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
