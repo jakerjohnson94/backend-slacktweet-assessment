@@ -60,21 +60,26 @@ def signal_handler(sig_num, frame):
 
     logger.warning(
         f'Received {signames[sig_num]}')
-    set_exit_flag(slackbot, twitterbot)
+    set_exit_flag(twitterbot, slackbot)
 
 
-def set_exit_flag(slackbot, tweetbot):
+def tear_down():
+    return False
+
+
+def set_exit_flag(twitterbot, slackbot):
     global exit_flag
-    exit_flag = True
+    twitterbot.stream.disconnect()
     slackbot.client.server.connected = False
-    tweetbot.stream.running = False
-    tweetbot.api.update_status(f'@{tweetbot.username} {dt.now()} exiting...')
+    exit_flag = True
 
 
-def main(slackbot, twitterbot):
+def main():
     # global twitter_stream
     # global exit_flag
     # global twitter_api
+    global twitterbot
+    global slackbot
     """
     This connects to twitter and slack clients and monitors
     both streams for messages mentioning our bot.
@@ -83,16 +88,22 @@ def main(slackbot, twitterbot):
                 'Starting Bobbot\n'
                 '----------------------------\n')
 
-    twitterbot.login()
     # async twitter stream monitor\
-    twitterbot.add_subscription('python')
-    twitterbot.monitor_stream()
+    twitterbot = Twitterbot(username='Bobbot2018', subscriptions=['python'])
+    slackbot = Slackbot('Bobbot', SLACKBOT_ID, SLACK_VERIFICATION_KEY,
+                        SLACK_OAUTH_ACCESS_KEY, SLACK_BOT_ACCESS_KEY)
+    # setup signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    twitterbot.start_stream()
+    # setup cients
 
     slackbot.connect_to_stream()
     slackbot.monitor_stream()
 
     # exit gracefully
-    logger.info('Shutting Down...')
+    logger.warning('Shutting Down...')
     logging.shutdown()
     raise SystemExit
 
@@ -100,15 +111,7 @@ def main(slackbot, twitterbot):
 if __name__ == "__main__":
     """ This is executed when run from the command line """
 
-    # setup signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    # setup cients
-    slackbot = Slackbot('Bobbot', SLACKBOT_ID, SLACK_VERIFICATION_KEY,
-                        SLACK_OAUTH_ACCESS_KEY, SLACK_BOT_ACCESS_KEY)
-    twitterbot = Twitterbot(BOT_TWITTER_HANDLE, TWITTER_CONSUMER_API_KEY,
-                            TWITTER_CONSUMER_SECRET_API_KEY, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET_TOKEN)
-    main(slackbot, twitterbot)
+    main()
 
 # Questions for Piero:
 # Firehose vs stream
