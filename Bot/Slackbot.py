@@ -10,6 +10,13 @@ from library.create_logger import create_logger
 bobbot_slack.py
 """
 
+# slack keys and variables
+SLACK_VERIFICATION_KEY = os.getenv("SLACK_VERIFICATION_KEY")
+SLACK_OAUTH_ACCESS_KEY = os.getenv("SLACK_OAUTH_ACCESS_KEY")
+SLACK_BOT_ACCESS_KEY = os.getenv("SLACK_BOT_ACCESS_KEY")
+SLACKBOT_ID = 'UF5QHDYCU'
+BOT_MENTIONED_STRING = f'<@{SLACKBOT_ID}>'
+
 
 class Slackbot(object):
     """
@@ -17,7 +24,7 @@ class Slackbot(object):
     and monitoring messages
     """
 
-    def __init__(self, name, slack_id, verification_key,
+    def __init__(self, name, slack_id, channel, verification_key,
                  oauth_key, access_key):
         """
         this function sets variables,
@@ -32,6 +39,7 @@ class Slackbot(object):
 
         self.name = name
         self.id = slack_id
+        self.channel = channel
         self.verification_key = verification_key
         self.oauth_key = oauth_key
         self.access_key = access_key
@@ -39,6 +47,21 @@ class Slackbot(object):
         self.exit_command = f'{self.mentioned_string} exit'
         self.client = SlackClient(self.access_key)
         self.logger = create_logger(__name__)
+
+    def __enter__(self):
+        """Implements SlackClient as a context manager"""
+        self.logger.debug('Enter SlackClient')
+        return self
+
+    def __exit__(self, type, value, traceback):
+        """Implements TwitterClient context manager"""
+        if self.client is not None and self.client.server is not None:
+            self.client.server.connected = False
+        self.logger.debug('Exit Slack Client')
+
+    def on_twitter_data(self, data):
+        self.client.rtm_send_message(
+            self.channel, "Who wants Ramen or Ramlets?")
 
     def monitor_stream(self):
         """ Monitor slack rtm feed for messages mentioning the bot
@@ -49,14 +72,13 @@ class Slackbot(object):
         while self.client.server.connected:
             try:
                 events = self.client.rtm_read()
-                self.parse_events(list(events))
+                self.monitor_events(list(events))
             except Exception as e:
                 self.logger.error(f'Failed to Read Slack Events\n{e}')
             time.sleep(2)
         self.logger.info('Exiting Slack Stream...')
 
-    def parse_events(self, events):
-        general_channel = '#general'
+    def monitor_events(self, events):
         for event in events:
             # only look for messages that mention the bot
             if 'message' in event.values() and self.id in event['text']:
@@ -73,7 +95,7 @@ class Slackbot(object):
                     # send response message in chat
                     try:
                         self.client.rtm_send_message(
-                            general_channel, "Who wants Ramen or Ramlets?")
+                            self.channel, "Who wants Ramen or Ramlets?")
                     except Exception as e:
                         self.logger.error(
                             f'Failed to send response message: {e}')

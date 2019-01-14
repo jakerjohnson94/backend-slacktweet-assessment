@@ -10,6 +10,6 @@ def create_logger(name):
     # create logger
     logging.basicConfig(format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     return logger

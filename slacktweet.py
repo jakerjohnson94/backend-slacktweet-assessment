@@ -75,9 +75,6 @@ def set_exit_flag(twitterbot, slackbot):
 
 
 def main():
-    # global twitter_stream
-    # global exit_flag
-    # global twitter_api
     global twitterbot
     global slackbot
     """
@@ -89,18 +86,15 @@ def main():
                 '----------------------------\n')
 
     # async twitter stream monitor\
-    twitterbot = Twitterbot(username='Bobbot2018', subscriptions=['python'])
-    slackbot = Slackbot('Bobbot', SLACKBOT_ID, SLACK_VERIFICATION_KEY,
-                        SLACK_OAUTH_ACCESS_KEY, SLACK_BOT_ACCESS_KEY)
-    # setup signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-    twitterbot.start_stream()
-    # setup cients
-
-    slackbot.connect_to_stream()
-    slackbot.monitor_stream()
+    with Twitterbot(username='Bobbot2018',
+                    subscriptions=['python']) as twitterbot:
+        with Slackbot('Bobbot', '#bobbot-twitter-stream', SLACKBOT_ID,
+                      SLACK_VERIFICATION_KEY, SLACK_OAUTH_ACCESS_KEY,
+                      SLACK_BOT_ACCESS_KEY) as slackbot:
+            # setup cients
+            twitterbot.start_stream()
+            slackbot.connect_to_stream()
+            slackbot.monitor_stream()
 
     # exit gracefully
     logger.warning('Shutting Down...')
@@ -110,6 +104,9 @@ def main():
 
 if __name__ == "__main__":
     """ This is executed when run from the command line """
+    # setup signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     main()
 
