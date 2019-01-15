@@ -28,7 +28,7 @@ logger = create_logger(__name__)
 
 def async_stream_start(self, is_async):
     """
-    Monkey patch for the tweepy.Stream class!
+    Monkey patch for the tweepy.Stream clbrewass!
     to allow immediate termination of the async stream listener thread
     """
     self.running = True
