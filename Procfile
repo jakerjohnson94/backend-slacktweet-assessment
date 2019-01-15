@@ -1,1 +1,1 @@
-worker: python3 slacktweet.py beer
+worker: python slacktweet.py beer
