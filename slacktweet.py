@@ -54,9 +54,6 @@ def signal_handler(sig_num, frame):
         signal.__dict__.items()))
         if v.startswith('SIG') and not v.startswith('SIG_'))
 
-    logger.warning(
-        f'Received {signames[sig_num]}')
-    exit_bots(twitterbot, slackbot)
 
 
 def create_args_parser():
@@ -72,6 +69,9 @@ def create_args_parser():
     # Specify output of "--version"
     args = parser.parse_args()
     return (parser, args)
+    logger.warning(
+        f'Received {signames[sig_num]}')
+    exit_bots(twitterbot, slackbot)
 
 
 def exit_bots(twitterbot, slackbot):
@@ -130,5 +130,5 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, signal_handler)
     parser, args = create_args_parser()
 
-    subs = [str(sub) for sub in *args.subscriptions]
+    subs = [str(sub) for sub in args.subscriptions]
     main(subs)
