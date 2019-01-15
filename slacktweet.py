@@ -89,6 +89,7 @@ def main(subscriptions):
     both streams for messages mentioning our bot.
     """
     print(SLACK_BOT_ACCESS_KEY)
+    print(TWITTER_ACCESS_TOKEN)
     logger.info('\n----------------------------\n'
                 'Starting Bobbot\n'
                 '----------------------------\n')
