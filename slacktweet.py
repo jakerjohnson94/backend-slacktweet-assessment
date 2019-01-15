@@ -64,6 +64,7 @@ def create_args_parser():
 
     # Required positional argument
     parser.add_argument("subscriptions",
+                        nargs='+',
                         help=("list of strings to subscribe to on"
                               "Twitter. These include usernames,"
                               "hashtags, and any other text"))
@@ -100,6 +101,8 @@ def main(subscriptions):
                       SLACK_BOT_ACCESS_KEY) as slackbot:
             # setup cients
             twitterbot.register_slack_function(slackbot.on_twitter_data)
+            slackbot.register_twitter_func(
+                twitterbot.on_slack_command)
             twitterbot.start_stream()
             slackbot.connect_to_stream()
             slackbot.monitor_stream()
@@ -125,4 +128,6 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     parser, args = create_args_parser()
-    main(args.subscriptions)
+
+    subs = [str(sub) for sub in args.subscriptions]
+    main(subs)
