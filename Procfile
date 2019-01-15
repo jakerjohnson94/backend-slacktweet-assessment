@@ -1,1 +1,1 @@
-worker: python3 slacktweet.py
+worker: python3 slacktweet.py @bobbot

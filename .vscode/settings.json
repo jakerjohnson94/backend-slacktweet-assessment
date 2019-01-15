@@ -1,5 +1,5 @@
 {
-  "python.pythonPath": "${workspaceFolder}/py3env/bin/python",
+  "python.pythonPath": "env/bin/python",
   "python.linting.pylintEnabled": false,
   "python.linting.pep8Enabled": true,
   "python.linting.enabled": true

@@ -20,7 +20,7 @@ Slacktweet Project
 __author__ = "Slackbot Team: Jake Johnson and Kyle Meiklejohn"
 # get enviornment variables
 load_dotenv()
-#heroku
+#comment for github
 # twitter keys and variables
 TWITTER_CONSUMER_API_KEY = os.getenv('TWITTER_CONSUMER_API_KEY')
 TWITTER_CONSUMER_SECRET_API_KEY = os.getenv('TWITTER_CONSUMER_SECRET_API_KEY')
