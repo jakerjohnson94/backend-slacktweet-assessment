@@ -199,4 +199,4 @@ class Twitterbot(tweepy.StreamListener):
         try:
             self.stream.running = False
         except Exception as e:
-            logger
+            logger.error('Tried to close stream, but it was already closed')
