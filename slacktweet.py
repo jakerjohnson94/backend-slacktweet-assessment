@@ -13,7 +13,7 @@ from library.create_logger import create_logger
 from Bot.Slackbot import Slackbot
 from Bot.Twitterbot import Twitterbot
 from datetime import datetime as dt
-
+from collections import Counter
 """
 Slacktweet Project
 """
@@ -38,12 +38,8 @@ BOT_MENTIONED_STRING = f'<@{SLACKBOT_ID}>'
 # setup logger
 logger = create_logger(__name__)
 
-# set exit flag to start
-exit_flag = False
-
 
 def signal_handler(sig_num, frame):
-    global exit_flag
     global logger
     global slackbot
     global twitterbot
@@ -60,44 +56,65 @@ def signal_handler(sig_num, frame):
 
     logger.warning(
         f'Received {signames[sig_num]}')
-    set_exit_flag(twitterbot, slackbot)
+    exit_bots(twitterbot, slackbot)
 
 
-def tear_down():
-    return False
+def create_args_parser():
+    parser = argparse.ArgumentParser()
+
+    # Required positional argument
+    parser.add_argument("subscriptions",
+                        help=("list of strings to subscribe to on"
+                              "Twitter. These include usernames,"
+                              "hashtags, and any other text"))
+
+    # Specify output of "--version"
+    args = parser.parse_args()
+    return (parser, args)
 
 
-def set_exit_flag(twitterbot, slackbot):
-    global exit_flag
-    twitterbot.stream.disconnect()
-    slackbot.client.server.connected = False
-    exit_flag = True
+def exit_bots(twitterbot, slackbot):
+    if twitterbot.stream.running:
+        twitterbot.close_stream()
+    if slackbot.client.server.connected:
+        slackbot.client.server.connected = False
 
 
-def main():
+def main(subscriptions):
     global twitterbot
     global slackbot
     """
     This connects to twitter and slack clients and monitors
     both streams for messages mentioning our bot.
     """
+
     logger.info('\n----------------------------\n'
                 'Starting Bobbot\n'
                 '----------------------------\n')
 
     # async twitter stream monitor\
     with Twitterbot(username='Bobbot2018',
-                    subscriptions=['python']) as twitterbot:
-        with Slackbot('Bobbot', '#bobbot-twitter-stream', SLACKBOT_ID,
+                    subscriptions=subscriptions) as twitterbot:
+        with Slackbot('Bobbot', SLACKBOT_ID, '#bobbot-twitter-stream',
                       SLACK_VERIFICATION_KEY, SLACK_OAUTH_ACCESS_KEY,
                       SLACK_BOT_ACCESS_KEY) as slackbot:
             # setup cients
+            twitterbot.register_slack_function(slackbot.on_twitter_data)
             twitterbot.start_stream()
             slackbot.connect_to_stream()
             slackbot.monitor_stream()
 
     # exit gracefully
     logger.warning('Shutting Down...')
+
+    logger.info('\n----------------------------\n'
+                'Bobbot Closed\n'
+                f'Gathered {twitterbot.total_events} Event(s) in'
+                f' {twitterbot.total_run_time} minutes\n'
+                f'An average of {twitterbot.events_per_min}'
+                f' Tweets per minute\n'
+                f'{twitterbot.create_top_user_str()}\n'
+                '----------------------------\n')
     logging.shutdown()
     raise SystemExit
 
@@ -107,11 +124,5 @@ if __name__ == "__main__":
     # setup signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-
-    main()
-
-# Questions for Piero:
-# Firehose vs stream
-# duplicate logger entries when name provided
-# exit flag vs rtm.server.connected / how to handle exit?
-# how to structure files
+    parser, args = create_args_parser()
+    main(args.subscriptions)
