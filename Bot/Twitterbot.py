@@ -11,6 +11,8 @@ from pprint import pprint
 from datetime import datetime as dt
 from threading import Thread
 from library.create_logger import create_logger
+from datetime import datetime
+from collections import Counter
 # get enviornment variables
 load_dotenv()
 # twitter keys and variables
@@ -19,6 +21,9 @@ CONSUMER_SECRET_API_KEY = os.getenv('TWITTER_CONSUMER_SECRET_API_KEY')
 ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
 ACCESS_SECRET_TOKEN = os.getenv('TWITTER_ACCESS_SECRET_TOKEN')
 BOT_TWITTER_HANDLE = 'BobBot2018'
+
+# create logger
+logger = create_logger(__name__)
 
 
 def async_stream_start(self, is_async):
@@ -44,73 +49,74 @@ class Twitterbot(tweepy.StreamListener):
     """
 
     def __init__(self, username, subscriptions):
-        self.logger = create_logger(__name__)
         self.username = username
         self.subscriptions = subscriptions
-        self.data_dict = dict()
+        self.event_list = []
         self.api = self.create_api()
-
-        self.logger.info('Connecting to Twitter stream...')
+        self.slack_func = None
+        logger.info('Connecting to Twitter stream...')
         # Patch the tweepy.Stream._start() method
-        self.logger.debug('Applying monkeypatch to tweepy.Stream class ...')
+        logger.debug('Applying monkeypatch to tweepy.Stream class ...')
         tweepy.Stream._start = async_stream_start
 
         # start stream
         self.stream = tweepy.Stream(auth=self.api.auth,
                                     listener=self)
+        self.start_time = time.time()
 
+# context manager functions
     def __enter__(self):
         """Implements TwitterClient as a context manager"""
-        self.logger.debug('Enter TwitterClient')
+        logger.debug('Enter TwitterClient')
         return self
 
     def __exit__(self, type, value, traceback):
         """Implements TwitterClient context manager"""
         if self.stream is not None:
             self.stream.disconnect()
-        self.logger.debug('Exit TwitterClient')
+        self.get_stream_summary()
+        logger.debug('Exit TwitterClient')
 
     def register_slack_function(self, func):
         if func is not None:
             self.slack_func = func
 
     def on_status(self, status):
-        data = status._json
-        username = data['user']['screen_name']
-        timestamp = data['timestamp_ms']
-        text = data['text']
-        if data['user']['name'] not in self.data_dict.keys():
-            self.data_dict[username] = {"messages": [
-                {"time": timestamp, "text": text}]}
-        else:
-            self.data_dict[username]["messages"].append(
-                {"time": timestamp, "text": text})
-        self.logger.info(f'Twitter event: {status.text}')
+        username = status.user.screen_name
+        text = status.text
+        timestamp = str(datetime.fromtimestamp(
+            float(status.timestamp_ms)/1000.0))
+        # timestamp = datetime.datetime.fromtimestamp(data[ms_/1000.0)
+        self.event_list.append(
+            {'username': username, 'text': text, "timestamp": timestamp, })
+        logger.info(f'Twitter event: {status.text}')
+        if self.slack_func is not None:
+            self.slack_func(self.event_list[-1])
 
     def on_disconnect(self, status):
-        self.logger.error(f'Disconnected from Twitter Stream. {status}')
+        logger.error(f'Disconnected from Twitter Stream. {status}')
 
     def add_subscription(self, slug):
         if slug in self.subscriptions:
             self.subscriptions.append(slug)
-            self.logger.info(f'added {slug} to current Twitter subscriptions.')
+            logger.info(f'added {slug} to current Twitter subscriptions.')
             self.start_stream()
         else:
-            self.logger.error(f'{slug} is already subscribed to')
+            logger.error(f'{slug} is already subscribed to')
 
     def delete_subscription(self, slug):
         if slug in self.subscriptions:
             self.subscriptions.pop(slug)
-            self.logger.info(f'Removed {slug} from current Twitter'
-                             'subscriptions.')
+            logger.info(f'Removed {slug} from current Twitter'
+                        'subscriptions.')
             self.start_stream()
         else:
-            self.logger.error(f'Failed to delete Twitter Subscription: {slug}'
-                              'was not found in the current stream'
-                              'subscriptions.')
+            logger.error(f'Failed to delete Twitter Subscription: {slug}'
+                         'was not found in the current stream'
+                         'subscriptions.')
 
     def update_subscriptions(self, subscriptions):
-        self.logger.info(f'Updating Twitter Subscriptions...')
+        logger.info(f'Updating Twitter Subscriptions...')
         self.subscriptions = subscriptions
         self.start_stream()
 
@@ -118,7 +124,7 @@ class Twitterbot(tweepy.StreamListener):
         """
         Logs in to twitter api using bot authorization tokens
         """
-        self.logger.info(f'Connecting to Twitter API as {self.username}...')
+        logger.info(f'Connecting to Twitter API as {self.username}...')
         try:
             auth = tweepy.OAuthHandler(
                 CONSUMER_API_KEY, CONSUMER_SECRET_API_KEY)
@@ -127,11 +133,66 @@ class Twitterbot(tweepy.StreamListener):
             return tweepy.API(auth)
 
         except Exception as e:
-            self.logger.error(f'Failed to login to Twitter: {e}')
+            logger.error(f'Failed to login to Twitter: {e}')
+
+    # event statistics
+    def set_total_events(self):
+        self.total_events = len(self.event_list)
+        return self.total_events
+
+    def set_total_run_time(self):
+        self.total_run_time = round((time.time() - self.start_time) / 60, 2)
+        return self.total_run_time
+
+    def set_top_user(self):
+        if self.event_list is not []:
+            user_data = [x['username'] for x in self.event_list]
+            user_counts = Counter(user_data)
+            top_users = sorted(user_counts.most_common(),
+                               key=lambda x: x[1], reverse=True)
+            if ((len(top_users) > 1 and top_users[0][1] == top_users[1][1]) or
+                    not top_users):
+                self.top_user = None
+            else:
+                self.top_user = top_users[0]
+            return self.top_user
+
+    def set_events_per_min(self):
+        if self.total_events and self.total_run_time:
+            self.events_per_min = int(
+                float(self.total_events) /
+                float(self.total_run_time))
+        else:
+            logger.error('Attempted to calculate total events'
+                         'per minute, but the stream has not ended')
+            self.events_per_min = None
+
+        return self.events_per_min
+
+    def get_stream_summary(self):
+        self.set_total_events()
+        self.set_total_run_time()
+        self.set_top_user()
+        self.set_events_per_min()
+
+    def create_top_user_str(self):
+        if self.top_user:
+            user, event_num = self.top_user
+            top_user_str = (f'@{user} had the most activity'
+                            f' with {event_num} events.')
+        else:
+            top_user_str = 'Multiple users had the most activity'
+        return top_user_str
 
     def start_stream(self):
         try:
-            self.logger.info(f'Monitoring Twitter for {self.subscriptions}...')
+            logger.info(f'Monitoring Twitter for {self.subscriptions}...')
             self.stream.filter(track=self.subscriptions, is_async=True)
         except Exception as e:
-            self.logger.error(f"Error: {e}")
+            logger.error(f"Error tracking Twitter Stream: {e}")
+
+    def close_stream(self):
+        try:
+            self.stream.running = False
+        except Exception as e:
+            logger
