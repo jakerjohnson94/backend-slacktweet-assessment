@@ -88,7 +88,7 @@ def main(subscriptions):
     This connects to twitter and slack clients and monitors
     both streams for messages mentioning our bot.
     """
-
+    print(SLACK_BOT_ACCESS_KEY)
     logger.info('\n----------------------------\n'
                 'Starting Bobbot\n'
                 '----------------------------\n')
