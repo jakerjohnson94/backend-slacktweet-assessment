@@ -81,6 +81,17 @@ class Twitterbot(tweepy.StreamListener):
         if func is not None:
             self.slack_func = func
 
+    def on_slack_command(self, command, subs):
+        self.close_stream()
+        self.stream = tweepy.Stream(auth=self.api.auth,
+                                    listener=self)
+        if command == 'update':
+            self.update_subscriptions(subs)
+        elif command == 'delete':
+            self.delete_subscriptions(subs)
+        elif command == 'add':
+            self.add_subscriptions(subs)
+
     def on_status(self, status):
         username = status.user.screen_name
         text = status.text
@@ -96,24 +107,16 @@ class Twitterbot(tweepy.StreamListener):
     def on_disconnect(self, status):
         logger.error(f'Disconnected from Twitter Stream. {status}')
 
-    def add_subscription(self, slug):
-        if slug in self.subscriptions:
-            self.subscriptions.append(slug)
-            logger.info(f'added {slug} to current Twitter subscriptions.')
-            self.start_stream()
-        else:
-            logger.error(f'{slug} is already subscribed to')
+    def add_subscriptions(self, slugs):
+        logger.info('Adding Subscription...')
+        self.subscriptions += slugs
+        self.start_stream()
 
-    def delete_subscription(self, slug):
-        if slug in self.subscriptions:
-            self.subscriptions.pop(slug)
-            logger.info(f'Removed {slug} from current Twitter'
-                        'subscriptions.')
-            self.start_stream()
-        else:
-            logger.error(f'Failed to delete Twitter Subscription: {slug}'
-                         'was not found in the current stream'
-                         'subscriptions.')
+    def delete_subscriptions(self, slugs):
+        logger.info('Deleting Subscription...')
+        for slug in slugs:
+            self.subscriptions.pop(self.subscriptions.index(slug))
+        self.start_stream()
 
     def update_subscriptions(self, subscriptions):
         logger.info(f'Updating Twitter Subscriptions...')
@@ -185,6 +188,7 @@ class Twitterbot(tweepy.StreamListener):
         return top_user_str
 
     def start_stream(self):
+        self.subscriptions = list(set(self.subscriptions))
         try:
             logger.info(f'Monitoring Twitter for {self.subscriptions}...')
             self.stream.filter(track=self.subscriptions, is_async=True)

@@ -46,7 +46,12 @@ class Slackbot(object):
         # self.oauth_key = oauth_key
         # self.access_key = access_key
         self.mentioned_string = f'<@{self.id}>'
-        self.exit_command = f'{self.mentioned_string} exit'
+        self.exit_command = f'{self.mentioned_string} exit',
+        self.sub_commands = {
+            'update': f'{self.mentioned_string} update',
+            'delete': f'{self.mentioned_string} delete',
+            'add': f'{self.mentioned_string} add',
+        }
         self.client = SlackClient(ACCESS_KEY)
         self.logger = create_logger(__name__)
 
@@ -60,6 +65,10 @@ class Slackbot(object):
         if self.client is not None and self.client.server is not None:
             self.client.server.connected = False
         self.logger.debug('Exit Slack Client')
+
+    def register_twitter_func(self, func):
+        if func is not None:
+            self.twitter_func = func
 
     def on_twitter_data(self, data):
         try:
@@ -81,11 +90,13 @@ class Slackbot(object):
                 events = self.client.rtm_read()
             except Exception as e:
                 # stream occasionally hickups, catch that error and reconnect
-                self.logger.warning(f'{e}')
-                time.sleep(0)
-                continue
-                # else:
-                #     self.logger.warning(f'{e}')
+                if str(e) == '[Errno 35] Resource temporarily unavailable':
+                    self.logger.warning(
+                        'Resource temporarily unavailable... Retrying...')
+                    time.sleep(0)
+                    continue
+                else:
+                    self.logger.error(f'{e}')
             if events:
                 self.monitor_events(list(events))
         self.logger.info('Exiting Slack Stream...')
@@ -95,12 +106,19 @@ class Slackbot(object):
             # only look for messages that mention the bot
             if ('message' in event.values() and
                     'text' in event.keys() and self.id in event['text']):
+                text = event['text'].strip()
+                text_list = text.split(' ')
                 # disconnect if we get an exit message
-                if event['text'].strip() == self.exit_command:
+                if text == self.exit_command:
                     self.logger.warning('Received Exit Message...')
                     self.client.server.connected = False
+                # CRUD commands for twitterbot subs
+                elif self.twitter_func is not None and len(text_list) > 2:
+                    command = text_list[1]
+                    subs = text_list[2:]
+                    self.twitter_func(command, subs)
                 else:
-                    # replace mention tag with bot name and log
+                        # replace mention tag with bot name and log
                     msg = event['text'].replace(
                         self.mentioned_string, f'@{self.name}')
 
