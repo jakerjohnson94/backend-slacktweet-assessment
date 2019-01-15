@@ -130,5 +130,5 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, signal_handler)
     parser, args = create_args_parser()
 
-    subs = [str(sub) for sub in args.subscriptions]
+    subs = [str(sub) for sub in *args.subscriptions]
     main(subs)
