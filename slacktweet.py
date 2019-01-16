@@ -36,7 +36,7 @@ SLACKBOT_ID = 'UF5QHDYCU'
 BOT_MENTIONED_STRING = f'<@{SLACKBOT_ID}>'
 
 # setup logger
-logger = create_logger(__name__)
+logger = create_logger(__file__)
 
 
 def signal_handler(sig_num, frame):
@@ -70,8 +70,7 @@ def create_args_parser():
                               "hashtags, and any other text"))
 
     # Specify output of "--version"
-    args = parser.parse_args()
-    return (parser, args)
+    return parser
 
 
 def exit_bots(twitterbot, slackbot):
@@ -88,7 +87,6 @@ def main(subscriptions):
     This connects to twitter and slack clients and monitors
     both streams for messages mentioning our bot.
     """
-    print(SLACK_BOT_ACCESS_KEY)
     logger.info('\n----------------------------\n'
                 'Starting Bobbot\n'
                 '----------------------------\n')
@@ -127,7 +125,9 @@ if __name__ == "__main__":
     # setup signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    parser, args = create_args_parser()
-
+    parser = create_args_parser()
+    args = parser.parse_args()
+    logger.debug(args)
     subs = [str(sub) for sub in args.subscriptions]
+    logger.debug(subs)
     main(subs)
