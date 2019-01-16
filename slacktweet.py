@@ -123,6 +123,8 @@ def main(subscriptions):
 if __name__ == "__main__":
     """ This is executed when run from the command line """
     # setup signal handlers
+    #commit
+    
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     parser = create_args_parser()
