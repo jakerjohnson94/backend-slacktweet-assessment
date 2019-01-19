@@ -18,7 +18,6 @@ logger = create_logger(__name__)
 
 
 def signal_handler(sig_num, frame):
-    global logger
     global slackbot
     global twitterbot
     """
@@ -51,8 +50,6 @@ def create_args_parser():
             "hashtags, and any other text"
         ),
     )
-
-    # Specify output of "--version"
     args = parser.parse_args()
     return (parser, args)
 
@@ -65,8 +62,6 @@ def exit_bots(twitterbot, slackbot):
 
 
 def main(subscriptions):
-    global twitterbot
-    global slackbot
     """
     This connects to twitter and slack clients and monitors
     both streams for messages mentioning our bot.
