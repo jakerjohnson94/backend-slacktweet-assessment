@@ -83,7 +83,7 @@ def main(subscriptions):
                     subscriptions=subscriptions) as twitterbot:
         with Slackbot("Bobbot", "#bobbot-twitter-stream",
                       ) as slackbot:
-            # setup cients
+
             twitterbot.register_slack_function(slackbot.on_twitter_data)
             slackbot.register_twitter_func(twitterbot.on_slack_command)
             twitterbot.start_stream()

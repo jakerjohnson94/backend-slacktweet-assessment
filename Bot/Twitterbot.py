@@ -1,7 +1,6 @@
 #! /usr/local/bin/python3
 import time
 import os
-from dotenv import load_dotenv
 import tweepy
 from threading import Thread
 from library.create_logger import create_logger
@@ -9,7 +8,6 @@ from datetime import datetime
 from collections import Counter
 
 # get enviornment variables
-load_dotenv()
 # twitter keys and variables
 CONSUMER_API_KEY = os.getenv("TWITTER_CONSUMER_API_KEY")
 CONSUMER_SECRET_API_KEY = os.getenv("TWITTER_CONSUMER_SECRET_API_KEY")

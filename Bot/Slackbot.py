@@ -1,19 +1,14 @@
 #! ./py3env/bin/python3.7
 import os
-from slackclient import SlackClient
 import time
+from slackclient import SlackClient
 from library.create_logger import create_logger
-from dotenv import load_dotenv
 
 
 """
 bobbot_slack.py
 """
 # get enviornment variables
-load_dotenv()
-# slack keys and variables
-# SLACK_VERIFICATION_KEY = os.getenv("SLACK_VERIFICATION_KEY")
-# SLACK_OAUTH_ACCESS_KEY = os.getenv("SLACK_OAUTH_ACCESS_KEY")
 ACCESS_KEY = os.getenv("SLACK_BOT_ACCESS_KEY")
 SLACKBOT_ID = "UF5QHDYCU"
 BOT_MENTIONED_STRING = f"<@{SLACKBOT_ID}>"
