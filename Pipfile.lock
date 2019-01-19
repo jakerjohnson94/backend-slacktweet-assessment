@@ -3,9 +3,9 @@
     "hash": {
       "sha256": "6d2574e15c5bcd4c25d294d3f742979681e94cdc91a96a80567adfb388c59a59"
     },
-    "pipfile-spec": 6,
+    "pipfile-spec": 7,
     "requires": {
-      "python_version": "3.6"
+      "python_version": "3.7.1"
     },
     "sources": [
       {
