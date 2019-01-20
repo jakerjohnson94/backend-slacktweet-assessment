@@ -1,8 +1,8 @@
 #! ./py3env/bin/python3.7
 import os
-import time
 from slackclient import SlackClient
 from library.create_logger import create_logger
+import threading
 
 
 """
@@ -40,6 +40,7 @@ class Slackbot(object):
         self.mentioned_string = f"<@{self.id}>"
         self.exit_command = f"{self.mentioned_string} exit"
         self.twitter_func = None
+        self.lock = threading.Lock()
         try:
             self.client = SlackClient(ACCESS_KEY)
         except Exception as e:
@@ -52,8 +53,7 @@ class Slackbot(object):
 
     def __exit__(self, type, value, traceback):
         """Implements TwitterClient context manager"""
-        if self.client is not None and self.client.server is not None:
-            self.client.server.connected = False
+        self.close_stream()
         logger.debug("Exit Slack Client")
 
     def register_twitter_func(self, func):
@@ -61,6 +61,7 @@ class Slackbot(object):
             self.twitter_func = func
 
     def on_twitter_data(self, data):
+        self.lock.acquire()
         try:
             self.client.rtm_send_message(
                 self.output_channel,
@@ -73,6 +74,8 @@ class Slackbot(object):
             )
         except Exception as e:
             logger.error(f"Failed to post Twitter event to Slack:\n{e}")
+        finally:
+            self.lock.release()
 
     def monitor_stream(self):
         """ Monitor slack rtm feed for messages mentioning the bot
@@ -80,19 +83,22 @@ class Slackbot(object):
         """
         logger.info("Monitoring Slack messages...")
         while self.client.server.connected:
+            self.lock.acquire()
             try:
                 events = self.client.rtm_read()
             except Exception as e:
                 # stream occasionally hickups, catch that error and reconnect
-                if str(e) == "[Errno 35] Resource temporarily unavailable":
-                    logger.warning(
-                        "Resource temporarily unavailable... Retrying...")
-                    time.sleep(0)
-                    continue
-                else:
-                    logger.error(f"{e}")
-            if events:
-                self.monitor_events(list(events))
+                # if "Resource temporarily unavailable" in str(e):
+                #     logger.warning(
+                #         "Resource temporarily unavailable... Retrying...")
+                #     time.sleep(0)
+                #     continue
+                # else:
+                logger.error(f"{e}")
+            finally:
+                self.lock.release()
+                if events:
+                    self.monitor_events(list(events))
         logger.info("Exiting Slack Stream...")
 
     def monitor_events(self, events):
@@ -109,7 +115,7 @@ class Slackbot(object):
 
                 if text == self.exit_command:
                     logger.warning("Received Exit Message...")
-                    self.client.server.connected = False
+                    self.close_stream()
                 # CRUD commands for twitterbot subs
                 elif self.twitter_func is not None and len(text_list) > 2:
                     command = text_list[1]
@@ -140,3 +146,10 @@ class Slackbot(object):
             logger.info("Successfully Connected to Slack Stream!")
         except Exception as e:
             logger.error(f"Connection to Slack Stream Failed. {e}")
+
+    def close_stream(self):
+        if self.client and self.client.server and self.client.server.connected:
+            try:
+                self.client.server.connected = False
+            except Exception as e:
+                logger.error(f"Tried to close stream, but it failed. {e}")

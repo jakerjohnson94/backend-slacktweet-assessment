@@ -6,6 +6,9 @@ from threading import Thread
 from library.create_logger import create_logger
 from datetime import datetime
 from collections import Counter
+import asyncio
+lock = asyncio.Lock()
+
 
 # get enviornment variables
 # twitter keys and variables
@@ -191,7 +194,8 @@ class Twitterbot(tweepy.StreamListener):
             logger.error(f"Error tracking Twitter Stream: {e}")
 
     def close_stream(self):
-        try:
-            self.stream.running = False
-        except Exception as e:
-            logger.error(f"Tried to close stream, but it failed. {e}")
+        if self.stream and self.stream.running:
+            try:
+                self.stream.running = False
+            except Exception as e:
+                logger.error(f"Tried to close stream, but it failed. {e}")

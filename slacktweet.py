@@ -50,6 +50,7 @@ def create_args_parser():
             "hashtags, and any other text"
         ),
     )
+    parser.add_argument('--channel', help=('Name of slack channel to post in'))
     args = parser.parse_args()
     return (parser, args)
 
@@ -57,16 +58,17 @@ def create_args_parser():
 def exit_bots(twitterbot, slackbot):
     if twitterbot.stream.running:
         twitterbot.close_stream()
-    if slackbot.client.server.connected:
-        slackbot.client.server.connected = False
+    slackbot.close_stream()
 
 
-def main(subscriptions):
+def main(args):
+    global slackbot
+    global twitterbot
     """
     This connects to twitter and slack clients and monitors
     both streams for messages mentioning our bot.
     """
-
+    channel = args.channel if args.channel else '#bobbot-twitter-stream'
     logger.info(
         "\n----------------------------\n"
         "Starting Bobbot\n"
@@ -75,8 +77,8 @@ def main(subscriptions):
 
     # async twitter stream monitor\
     with Twitterbot(username="Bobbot2018",
-                    subscriptions=subscriptions) as twitterbot:
-        with Slackbot("Bobbot", "#bobbot-twitter-stream",
+                    subscriptions=args.subscriptions) as twitterbot:
+        with Slackbot("Bobbot", channel,
                       ) as slackbot:
 
             twitterbot.register_slack_function(slackbot.on_twitter_data)
@@ -109,5 +111,5 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, signal_handler)
     parser, args = create_args_parser()
 
-    subs = [str(sub) for sub in args.subscriptions]
-    main(subs)
+    args.subscriptions = [str(sub) for sub in args.subscriptions]
+    main(args)
