@@ -50,7 +50,7 @@ def create_args_parser():
             "hashtags, and any other text"
         ),
     )
-    parser.add_argument('--channel', help=('Name of slack channel to post in'))
+    parser.add_argument("--channel", help=("Name of slack channel to post in"))
     args = parser.parse_args()
     return (parser, args)
 
@@ -68,7 +68,7 @@ def main(args):
     This connects to twitter and slack clients and monitors
     both streams for messages mentioning our bot.
     """
-    channel = args.channel if args.channel else '#bobbot-twitter-stream'
+    channel = args.channel if args.channel else "#bobbot-twitter-stream"
     logger.info(
         "\n----------------------------\n"
         "Starting Bobbot\n"
@@ -76,10 +76,10 @@ def main(args):
     )
 
     # async twitter stream monitor\
-    with Twitterbot(username="Bobbot2018",
-                    subscriptions=args.subscriptions) as twitterbot:
-        with Slackbot("Bobbot", channel,
-                      ) as slackbot:
+    with Twitterbot(
+        username="Bobbot2018", subscriptions=args.subscriptions
+    ) as twitterbot:
+        with Slackbot("Bobbot", channel) as slackbot:
 
             twitterbot.register_slack_function(slackbot.on_twitter_data)
             slackbot.register_twitter_func(twitterbot.on_slack_command)
