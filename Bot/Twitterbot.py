@@ -28,7 +28,8 @@ def async_stream_start(self, is_async):
     if is_async:
         # In this patch we set 'daemon=True' during async thread creation
         # this allows us to kill the entire thread immediately when we exit
-        self._thread = Thread(target=self._run, name="tweepy.Stream", daemon=True)
+        self._thread = Thread(
+            target=self._run, name="tweepy.Stream", daemon=True)
         self._thread.start()
     else:
         self._run()
@@ -103,7 +104,8 @@ class Twitterbot(tweepy.StreamListener):
         """
         username = status.user.screen_name
         text = status.text
-        timestamp = str(datetime.fromtimestamp(float(status.timestamp_ms) / 1000.0))
+        timestamp = str(datetime.fromtimestamp(
+            float(status.timestamp_ms) / 1000.0))
         # timestamp = datetime.datetime.fromtimestamp(data[ms_/1000.0)
         self.event_list.append(
             {"username": username, "text": text, "timestamp": timestamp}
@@ -145,7 +147,8 @@ class Twitterbot(tweepy.StreamListener):
         """
         logger.info(f"Connecting to Twitter API as {self.username}...")
         try:
-            auth = tweepy.OAuthHandler(CONSUMER_API_KEY, CONSUMER_SECRET_API_KEY)
+            auth = tweepy.OAuthHandler(
+                CONSUMER_API_KEY, CONSUMER_SECRET_API_KEY)
             auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET_TOKEN)
             return tweepy.API(auth)
 

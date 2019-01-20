@@ -72,9 +72,9 @@ class Slackbot(object):
             self.send_message(
                 self.output_channel,
                 (
-                    f"## Incoming Tweet ##\n"
+                    f"🐦🐦 Incoming Tweet 🐦🐦\n"
                     f"{data['timestamp']} - "
-                    "@{data['username']}:"
+                    f"@{data['username']}:"
                     f"\n{data['text']}\n\n"
                 ),
             )
