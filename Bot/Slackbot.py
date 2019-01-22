@@ -73,7 +73,6 @@ class Slackbot(object):
                 self.output_channel,
                 (
                     f"🐦🐦 Incoming Tweet 🐦🐦\n"
-                    f"{data['timestamp']} - "
                     f"@{data['username']}:"
                     f"\n{data['text']}\n\n"
                 ),
@@ -89,6 +88,7 @@ class Slackbot(object):
         """
         logger.info("Monitoring Slack messages...")
         while self.client.server.connected:
+            # turn on thread lock
             self.lock.acquire()
             try:
                 events = self.client.rtm_read()
@@ -135,7 +135,8 @@ class Slackbot(object):
                     # CRUD commands for twitterbot subs
                     command = text_list[1]
                     subs = text_list[2:]
-                    self.twitter_func(command, subs, self)
+                    if command in ["update", "add", "delete"]:
+                        self.twitter_func(command, subs, self)
 
                 else:
                     # Normal message, respond

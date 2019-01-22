@@ -38,9 +38,11 @@ def signal_handler(sig_num, frame):
 
 
 def create_args_parser():
+    """
+    Create argparser with a list of subscriptions
+    and and optional output channel
+    """
     parser = argparse.ArgumentParser()
-
-    # Required positional argument
     parser.add_argument(
         "subscriptions",
         nargs="+",
@@ -50,14 +52,17 @@ def create_args_parser():
             "hashtags, and any other text"
         ),
     )
-    parser.add_argument("--channel", help=("Name of slack channel to post in"))
+    parser.add_argument(
+        "--channel",
+        help="Name of slack channel to post in",
+        default="#bobbot-twitter-stream",
+    )
     args = parser.parse_args()
-    return (parser, args)
+    return args
 
 
 def exit_bots(twitterbot, slackbot):
-    if twitterbot.stream.running:
-        twitterbot.close_stream()
+    twitterbot.close_stream()
     slackbot.close_stream()
 
 
@@ -68,7 +73,6 @@ def main(args):
     This connects to twitter and slack clients and monitors
     both streams for messages mentioning our bot.
     """
-    channel = args.channel if args.channel else "#bobbot-twitter-stream"
     logger.info(
         "\n----------------------------\n"
         "Starting Bobbot\n"
@@ -79,7 +83,7 @@ def main(args):
     with Twitterbot(
         username="Bobbot2018", subscriptions=args.subscriptions
     ) as twitterbot:
-        with Slackbot("Bobbot", channel) as slackbot:
+        with Slackbot("Bobbot", args.channel) as slackbot:
 
             twitterbot.register_slack_function(slackbot.on_twitter_data)
             slackbot.register_twitter_func(twitterbot.on_slack_command)
@@ -109,7 +113,7 @@ if __name__ == "__main__":
     # setup signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    parser, args = create_args_parser()
+    args = create_args_parser()
 
     args.subscriptions = [str(sub) for sub in args.subscriptions]
     main(args)

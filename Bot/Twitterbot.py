@@ -7,7 +7,6 @@ from library.create_logger import create_logger
 from datetime import datetime
 from collections import Counter
 
-# get enviornment variables
 # twitter keys and variables
 CONSUMER_API_KEY = os.getenv("TWITTER_CONSUMER_API_KEY")
 CONSUMER_SECRET_API_KEY = os.getenv("TWITTER_CONSUMER_SECRET_API_KEY")
@@ -37,11 +36,15 @@ def async_stream_start(self, is_async):
 
 class Twitterbot(tweepy.StreamListener):
     """
-    this class creates a twitterbot objeect capable of logging into Twitter,
+    Creates a twitterbot objeect capable of logging into Twitter,
     monitoring/sending messages and subscribing to feeds
     """
 
     def __init__(self, username, subscriptions):
+        """
+        Initializes bot and connects to twitter api, then
+        starts a twitter stream and run timer
+        """
         self.username = username
         self.subscriptions = subscriptions
         self.event_list = []
@@ -63,24 +66,23 @@ class Twitterbot(tweepy.StreamListener):
         return self
 
     def __exit__(self, type, value, traceback):
-        """Implements TwitterClient context manager"""
-        if self.stream is not None:
-            self.stream.disconnect()
-        self.get_stream_summary()
-        logger.debug("Exit TwitterClient")
+        """Exits Twitterclient context manager """
+        logger.debug("Context Manager Exiting TwitterClient")
+        self.close_stream()
 
     def register_slack_function(self, func):
         """
-        function to allow us to communicate data to our slackbot
+        Communicates data to our slackbot
         this method is called at the end of on_status()
-        overriding this method allows us to send self.event
+        overriding this method allows us to send self.events
         data to other classes
         """
         if func is not None:
             self.slack_func = func
 
     def on_slack_command(self, command, subs, slackbot):
-        """this function handles a CRUD command on slack
+        """
+        Handles a CRUD command on slack
         and runs the appropriate subscription function
         then restarts the stream
         """
@@ -99,7 +101,8 @@ class Twitterbot(tweepy.StreamListener):
         self.start_stream()
 
     def on_status(self, status):
-        """ This function takes data from a twitter event
+        """
+        Takes data from a twitter event
         and adds it to our list of events, then calls our slack func
         """
         username = status.user.screen_name
@@ -115,36 +118,28 @@ class Twitterbot(tweepy.StreamListener):
             self.slack_func(self.event_list[-1])
 
     def on_disconnect(self, status):
-        """
-        overwrite tweepy disconnect class
-        """
+        """Overwrites tweepy disconnect class"""
         logger.error(f"Disconnected from Twitter Stream. {status}")
 
     def add_subscriptions(self, slugs):
-        """
-        adds a twitter subscription to our subscriptions
-        """
+        """Adds a twitter subscription to our subscriptions"""
         logger.info("Adding Subscription...")
         self.subscriptions += slugs
 
     def delete_subscriptions(self, slugs):
-        """
-        removes a subscription from our sub list
-        """
+        """Removes a subscription from our sub list"""
         logger.info("Deleting Subscription...")
         for slug in slugs:
             if slug in self.subscriptions:
                 self.subscriptions.pop(self.subscriptions.index(slug))
 
     def update_subscriptions(self, subscriptions):
-        """sets a new list of subscriptions"""
+        """Sets a new list of subscriptions"""
         logger.info(f"Updating Twitter Subscriptions...")
         self.subscriptions = subscriptions
 
     def create_api(self):
-        """
-        Logs in to twitter api using bot authorization tokens
-        """
+        """Logs in to twitter api using bot authorization tokens"""
         logger.info(f"Connecting to Twitter API as {self.username}...")
         try:
             auth = tweepy.OAuthHandler(
@@ -157,22 +152,18 @@ class Twitterbot(tweepy.StreamListener):
 
     # event statistics
     def set_total_events(self):
-        """
-        count total number of events that were monitored
-        """
+        """Counts total number of events that were monitored"""
         self.total_events = len(self.event_list)
         return self.total_events
 
     def set_total_run_time(self):
-        """
-        calculate and round the total runtime of this bot
-        """
+        """Calculates and rounds the total runtime of this bot"""
         self.total_run_time = round((time.time() - self.start_time) / 60, 2)
         return self.total_run_time
 
     def set_top_user(self):
         """
-        search through monitored twitter data to find
+        Searches through monitored twitter data to find
         user with the most activity. If multiple users
         have the most activity, return None
         """
@@ -192,7 +183,7 @@ class Twitterbot(tweepy.StreamListener):
 
     def set_events_per_min(self):
         """
-        calculate the average number of Twitter events
+        Calculates the average number of Twitter events
         per minute based on the bot's runtime
         """
         if self.total_events and self.total_run_time:
@@ -210,7 +201,7 @@ class Twitterbot(tweepy.StreamListener):
 
     def get_stream_summary(self):
         """
-        find total events, run time, top user, and events per min
+        Finds total events, run time, top user, and events per min
         to be displayed once the program exits
         """
         self.set_total_events()
@@ -219,22 +210,21 @@ class Twitterbot(tweepy.StreamListener):
         self.set_events_per_min()
 
     def create_top_user_str(self):
-        """
-        Format the top user to be logged to output
-        """
+        """Formats the top user to be logged to output"""
         if self.top_user:
-            user, event_num = self.top_user
-            top_user_str = f"@{user} had the most activity"
-            f" with {event_num} events."
+            username, event_count = self.top_user
+            top_user_str = f"@{username} had the most activity"
+            f" with {event_count} events."
         else:
             top_user_str = "Multiple users had the most activity"
         return top_user_str
 
     def start_stream(self):
         """
-        set subscriptions and begin async thread
+        Sets subscriptions and begin async thread
         to monitor twitter events
         """
+        # remove duplicate subscriptions before we start monitoring the stream
         self.subscriptions = list(set(self.subscriptions))
         try:
             logger.info(f"Monitoring Twitter for {self.subscriptions}...")
@@ -243,11 +233,11 @@ class Twitterbot(tweepy.StreamListener):
             logger.error(f"Error tracking Twitter Stream: {e}")
 
     def close_stream(self):
-        """
-        disconnect the stream to exit thread
-        """
+        """Disconnects the stream to exit thread"""
         if self.stream and self.stream.running:
             try:
                 self.stream.running = False
+                logger.info("Exiting TwitterClient")
+                self.get_stream_summary()
             except Exception as e:
                 logger.error(f"Tried to close stream, but it failed. {e}")
