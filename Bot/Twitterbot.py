@@ -24,11 +24,11 @@ def async_stream_start(self, is_async):
     to allow immediate termination of the async stream listener thread
     """
     self.running = True
+
     if is_async:
         # In this patch we set 'daemon=True' during async thread creation
         # this allows us to kill the entire thread immediately when we exit
-        self._thread = Thread(
-            target=self._run, name="tweepy.Stream", daemon=True)
+        self._thread = Thread(target=self._run, name="tweepy.Stream", daemon=True)
         self._thread.start()
     else:
         self._run()
@@ -95,8 +95,8 @@ class Twitterbot(tweepy.StreamListener):
         elif command == "add":
             self.add_subscriptions(subs)
         slackbot.send_message(
-            slackbot.output_channel,
-            f"Subscription list changed. Monitoring {self.subscriptions}",
+            channel=slackbot.output_channel,
+            message=(f"Subscription list changed. Monitoring {self.subscriptions}"),
         )
         self.start_stream()
 
@@ -107,8 +107,7 @@ class Twitterbot(tweepy.StreamListener):
         """
         username = status.user.screen_name
         text = status.text
-        timestamp = str(datetime.fromtimestamp(
-            float(status.timestamp_ms) / 1000.0))
+        timestamp = str(datetime.fromtimestamp(float(status.timestamp_ms) / 1000.0))
         # timestamp = datetime.datetime.fromtimestamp(data[ms_/1000.0)
         self.event_list.append(
             {"username": username, "text": text, "timestamp": timestamp}
@@ -142,8 +141,7 @@ class Twitterbot(tweepy.StreamListener):
         """Logs in to twitter api using bot authorization tokens"""
         logger.info(f"Connecting to Twitter API as {self.username}...")
         try:
-            auth = tweepy.OAuthHandler(
-                CONSUMER_API_KEY, CONSUMER_SECRET_API_KEY)
+            auth = tweepy.OAuthHandler(CONSUMER_API_KEY, CONSUMER_SECRET_API_KEY)
             auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET_TOKEN)
             return tweepy.API(auth)
 

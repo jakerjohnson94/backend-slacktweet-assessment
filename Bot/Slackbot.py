@@ -11,20 +11,22 @@ Slackbot.py
 """
 # get enviornment variables
 ACCESS_KEY = os.getenv("SLACK_BOT_ACCESS_KEY")
+
 SLACKBOT_ID = "UF5QHDYCU"
 BOT_MENTIONED_STRING = f"<@{SLACKBOT_ID}>"
+
 logger = create_logger(__name__)
 
 
 class Slackbot(object):
     """
-    creats a slackbot object capable of logging into slack
+    Creates a slackbot object capable of logging into slack
     and monitoring messages
     """
 
     def __init__(self, name, channel):
         """
-        this function sets variables,
+        This function sets variables,
         sets up a slack client, and sets logger
         params:
         name: the name of this bot used on Slack
@@ -57,7 +59,7 @@ class Slackbot(object):
 
     def register_twitter_func(self, func):
         """
-        function to register a twitter func
+        Function to register a twitter func
         once set, we can pass data to a twitterbot
         """
         if func is not None:
@@ -65,14 +67,14 @@ class Slackbot(object):
 
     def on_twitter_data(self, data):
         """
-        publish tweets to the output channel
+        Publish tweets to the output channel
         """
         self.lock.acquire()
         try:
             self.send_message(
                 self.output_channel,
                 (
-                    f"🐦🐦 Incoming Tweet 🐦🐦\n"
+                    "🐦🐦 Incoming Tweet 🐦🐦\n"
                     f"@{data['username']}:"
                     f"\n{data['text']}\n\n"
                 ),
@@ -83,7 +85,8 @@ class Slackbot(object):
             self.lock.release()
 
     def monitor_stream(self):
-        """ Monitor slack rtm feed for messages mentioning the bot
+        """
+        Monitor slack rtm feed for messages mentioning the bot
         if the message is an exit message,
         """
         logger.info("Monitoring Slack messages...")
@@ -114,7 +117,7 @@ class Slackbot(object):
 
     def monitor_events(self, events):
         """
-        monitor slack stream for messages that mention out bots name
+        Monitor slack stream for messages that mention out bots name
         and respond to them accordingly
         """
         for event in events:
@@ -155,14 +158,14 @@ class Slackbot(object):
         self.send_message(self.output_channel, "Who wants Ramen or Ramlets?")
 
     def handle_exit_command(self, channel):
-        """send an exit message upon exiting and close the stream"""
+        """Send an exit message upon exiting and close the stream"""
         logger.warning("Received Exit Message...")
         self.send_message(channel, "Okay. Bye.")
         self.close_stream()
 
     def send_message(self, channel, message):
         """
-        send an rtm message on slack
+        Send an rtm message on slack
         """
         try:
             self.client.rtm_send_message(channel, message)
@@ -182,9 +185,7 @@ class Slackbot(object):
             logger.error(f"Connection to Slack Stream Failed. {e}")
 
     def close_stream(self):
-        """
-        disconnect the client server
-        """
+        """Disconnect the client server"""
         if self.client and self.client.server and self.client.server.connected:
             try:
                 self.client.server.connected = False

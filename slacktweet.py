@@ -7,7 +7,6 @@ from library.create_logger import create_logger
 from Bot.Slackbot import Slackbot
 from Bot.Twitterbot import Twitterbot
 
-
 """
 Slacktweet Project
 """
@@ -109,7 +108,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    """ This is executed when run from the command line """
+    """This is executed when run from the command line"""
     # setup signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
