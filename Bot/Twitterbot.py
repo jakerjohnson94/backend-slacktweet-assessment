@@ -28,7 +28,9 @@ def async_stream_start(self, is_async):
     if is_async:
         # In this patch we set 'daemon=True' during async thread creation
         # this allows us to kill the entire thread immediately when we exit
-        self._thread = Thread(target=self._run, name="tweepy.Stream", daemon=True)
+        self._thread = Thread(
+            target=self._run, name="tweepy.Stream", daemon=True
+        )
         self._thread.start()
     else:
         self._run()
@@ -50,6 +52,9 @@ class Twitterbot(tweepy.StreamListener):
         self.event_list = []
         self.api = self.create_api()
         self.slack_func = None
+        self.slackbot = None
+        self.total_events = 0
+        self.events_per_min = 0
         logger.info("Connecting to Twitter stream...")
         # Patch the tweepy.Stream._start() method
         logger.debug("Applying monkeypatch to tweepy.Stream class ...")
@@ -70,15 +75,14 @@ class Twitterbot(tweepy.StreamListener):
         logger.debug("Context Manager Exiting TwitterClient")
         self.close_stream()
 
-    def register_slack_function(self, func):
-        """
-        Communicates data to our slackbot
-        this method is called at the end of on_status()
-        overriding this method allows us to send self.events
-        data to other classes
-        """
-        if func is not None:
-            self.slack_func = func
+    def register_slackbot(self, slackbot):
+        """register method to allow us access
+        to our slackbot from within the twitterbot"""
+        if slackbot is not None:
+            self.slackbot = slackbot
+            logger.info(
+                f"successefully registered {self.slackbot.id} to the twitterbot"
+            )
 
     def on_slack_command(self, command, subs, slackbot):
         """
@@ -95,8 +99,7 @@ class Twitterbot(tweepy.StreamListener):
         elif command == "add":
             self.add_subscriptions(subs)
         slackbot.send_message(
-            channel=slackbot.output_channel,
-            message=(f"Subscription list changed. Monitoring {self.subscriptions}"),
+            f"Subscription list changed. Monitoring {self.subscriptions}"
         )
         self.start_stream()
 
@@ -107,14 +110,16 @@ class Twitterbot(tweepy.StreamListener):
         """
         username = status.user.screen_name
         text = status.text
-        timestamp = str(datetime.fromtimestamp(float(status.timestamp_ms) / 1000.0))
+        timestamp = str(
+            datetime.fromtimestamp(float(status.timestamp_ms) / 1000.0)
+        )
         # timestamp = datetime.datetime.fromtimestamp(data[ms_/1000.0)
         self.event_list.append(
             {"username": username, "text": text, "timestamp": timestamp}
         )
         logger.info(f"Twitter event: {status.text}")
-        if self.slack_func is not None:
-            self.slack_func(self.event_list[-1])
+        if self.slackbot is not None:
+            self.slackbot.publish_tweet_to_slack(self.event_list[-1])
 
     def on_disconnect(self, status):
         """Overwrites tweepy disconnect class"""
@@ -141,7 +146,9 @@ class Twitterbot(tweepy.StreamListener):
         """Logs in to twitter api using bot authorization tokens"""
         logger.info(f"Connecting to Twitter API as {self.username}...")
         try:
-            auth = tweepy.OAuthHandler(CONSUMER_API_KEY, CONSUMER_SECRET_API_KEY)
+            auth = tweepy.OAuthHandler(
+                CONSUMER_API_KEY, CONSUMER_SECRET_API_KEY
+            )
             auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET_TOKEN)
             return tweepy.API(auth)
 

@@ -39,8 +39,10 @@ class Slackbot(object):
         self.id = SLACKBOT_ID
         self.output_channel = channel
         self.mentioned_string = f"<@{self.id}>"
-        self.exit_command = f"{self.mentioned_string} exit"
+        self.slack_commands = {"exit": self.handle_exit_command}
+        self.twitter_commands = ["update", "add", "delete"]
         self.twitter_func = None
+        self.twitterbot = None
         self.lock = threading.Lock()
         try:
             self.client = SlackClient(ACCESS_KEY)
@@ -57,27 +59,25 @@ class Slackbot(object):
         self.close_stream()
         logger.debug("Exit Slack Client")
 
-    def register_twitter_func(self, func):
-        """
-        Function to register a twitter func
-        once set, we can pass data to a twitterbot
-        """
-        if func is not None:
-            self.twitter_func = func
+    def register_twitterbot(self, twitterbot):
+        """register method to allow us access
+        to our twitterbot from within the slackbot"""
+        if twitterbot is not None:
+            self.twitterbot = twitterbot
+            logger.info(
+                f"Registered twitterbot {self.twitterbot.username} to the slackbot"
+            )
 
-    def on_twitter_data(self, data):
+    def publish_tweet_to_slack(self, data):
         """
         Publish tweets to the output channel
         """
         self.lock.acquire()
         try:
             self.send_message(
-                self.output_channel,
-                (
-                    "🐦🐦 Incoming Tweet 🐦🐦\n"
-                    f"@{data['username']}:"
-                    f"\n{data['text']}\n\n"
-                ),
+                "🐦🐦 Incoming Tweet 🐦🐦\n"
+                f"@{data['username']}:"
+                f"\n{data['text']}\n\n"
             )
         except Exception as e:
             logger.error(f"Failed to post Twitter event to Slack:\n{e}")
@@ -102,7 +102,7 @@ class Slackbot(object):
                 # See https://github.com/slackapi/python-slackclient/issues/36
                 error_str = (
                     "The Slack RTM host unexpectedly closed its"
-                    "websocket.\nRestarting ..."
+                    "websocket. Restarting ..."
                 )
                 logger.error(error_str, exc_info=True)
                 time.sleep(2)
@@ -125,25 +125,26 @@ class Slackbot(object):
             if (
                 "message" in event.values()
                 and "text" in event.keys()
-                and self.id in event["text"]
+                and self.mentioned_string in event["text"]
             ):
                 text = event["text"].strip()
                 text_list = text.split(" ")
+                if len(text_list) == 2:
+                    command = text_list[-1].lower()
+                    if command in self.slack_commands.keys():
+                        # call appropriate command method
+                        self.slack_commands[command]()
 
-                if text == self.exit_command:
-                    # disconnect if we get an exit message
-                    self.handle_exit_command(self.output_channel)
-
-                elif self.twitter_func is not None and len(text_list) > 2:
+                elif self.twitterbot is not None and len(text_list) > 2:
                     # CRUD commands for twitterbot subs
                     command = text_list[1]
                     subs = text_list[2:]
-                    if command in ["update", "add", "delete"]:
-                        self.twitter_func(command, subs, self)
+                    if command in self.twitter_commands:
+                        self.twitterbot.on_slack_command(command, subs, self)
 
-                else:
-                    # Normal message, respond
-                    self.respond_to_mention(event)
+                # else:
+                #     # Normal message, respond
+                #     self.respond_to_mention(event)
 
     def respond_to_mention(self, event):
         """
@@ -155,20 +156,20 @@ class Slackbot(object):
 
         logger.info(f"Bot was mentioned: {msg}")
         # send response message in chat
-        self.send_message(self.output_channel, "Who wants Ramen or Ramlets?")
+        self.send_message("Who wants Ramen or Ramlets?")
 
-    def handle_exit_command(self, channel):
+    def handle_exit_command(self, *args):
         """Send an exit message upon exiting and close the stream"""
         logger.warning("Received Exit Message...")
-        self.send_message(channel, "Okay. Bye.")
+        self.send_message("`Shutting Down...`")
         self.close_stream()
 
-    def send_message(self, channel, message):
+    def send_message(self, message):
         """
         Send an rtm message on slack
         """
         try:
-            self.client.rtm_send_message(channel, message)
+            self.client.rtm_send_message(self.output_channel, message)
         except Exception as e:
             logger.error(f"Failed to send message: {e}")
 

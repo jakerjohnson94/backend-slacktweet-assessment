@@ -84,18 +84,17 @@ def main(args):
     ) as twitterbot:
         with Slackbot("Bobbot", args.channel) as slackbot:
 
-            twitterbot.register_slack_function(slackbot.on_twitter_data)
-            slackbot.register_twitter_func(twitterbot.on_slack_command)
+            slackbot.register_twitterbot(twitterbot)
+            twitterbot.register_slackbot(slackbot)
+
             twitterbot.start_stream()
             slackbot.connect_to_stream()
             slackbot.monitor_stream()
 
     # exit gracefully
     logger.warning("Shutting Down...")
-
-    logger.info(
+    summary = (
         "\n----------------------------\n"
-        "Bobbot Closed\n"
         f"Gathered {twitterbot.total_events} Event(s) in"
         f" {twitterbot.total_run_time} minutes\n"
         f"An average of {twitterbot.events_per_min}"
@@ -103,6 +102,8 @@ def main(args):
         f"{twitterbot.create_top_user_str()}\n"
         "----------------------------\n"
     )
+    slackbot.send_message(f"```{summary}```")
+    logger.info(summary)
     logging.shutdown()
     raise SystemExit
 
