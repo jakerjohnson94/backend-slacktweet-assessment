@@ -1,36 +1,33 @@
 #! ./py3env/bin/python3.7
-import logging
 import os
-from pprint import pprint
 from slackclient import SlackClient
-import time
 from library.create_logger import create_logger
-from dotenv import load_dotenv
-import errno
+import threading
+import time
+from websocket import WebSocketConnectionClosedException
+
 """
-bobbot_slack.py
+Slackbot.py
 """
 # get enviornment variables
-load_dotenv()
-# slack keys and variables
-# SLACK_VERIFICATION_KEY = os.getenv("SLACK_VERIFICATION_KEY")
-# SLACK_OAUTH_ACCESS_KEY = os.getenv("SLACK_OAUTH_ACCESS_KEY")
 ACCESS_KEY = os.getenv("SLACK_BOT_ACCESS_KEY")
-SLACKBOT_ID = 'UF5QHDYCU'
-BOT_MENTIONED_STRING = f'<@{SLACKBOT_ID}>'
+
+SLACKBOT_ID = "UF5QHDYCU"
+BOT_MENTIONED_STRING = f"<@{SLACKBOT_ID}>"
+
+logger = create_logger(__name__)
 
 
 class Slackbot(object):
     """
-    creats a slackbot object capable of logging into slack
+    Creates a slackbot object capable of logging into slack
     and monitoring messages
     """
 
-    def __init__(self, name, slack_id, channel, verification_key,
-                 oauth_key, access_key):
+    def __init__(self, name, channel):
         """
-        this function sets variables,
-        sets up a slack client, and sets up a logger
+        This function sets variables,
+        sets up a slack client, and sets logger
         params:
         name: the name of this bot used on Slack
         id: the slack ID of this bot
@@ -38,108 +35,159 @@ class Slackbot(object):
             the given secret keys of this bot
             for use with slack api
         """
-
         self.name = name
-        self.id = slack_id
+        self.id = SLACKBOT_ID
         self.output_channel = channel
-        # self.verification_key = verification_key
-        # self.oauth_key = oauth_key
-        # self.access_key = access_key
-        self.mentioned_string = f'<@{self.id}>'
-        self.exit_command = f'{self.mentioned_string} exit',
-        self.sub_commands = {
-            'update': f'{self.mentioned_string} update',
-            'delete': f'{self.mentioned_string} delete',
-            'add': f'{self.mentioned_string} add',
-        }
-        self.client = SlackClient(ACCESS_KEY)
-        self.logger = create_logger(__name__)
+        self.mentioned_string = f"<@{self.id}>"
+        self.exit_command = f"{self.mentioned_string} exit"
+        self.twitter_func = None
+        self.lock = threading.Lock()
+        try:
+            self.client = SlackClient(ACCESS_KEY)
+        except Exception as e:
+            logger.error(f"failed to connect to Slack Client:\n{e}")
 
     def __enter__(self):
         """Implements SlackClient as a context manager"""
-        self.logger.debug('Enter SlackClient')
+        logger.debug("Enter SlackClient")
         return self
 
     def __exit__(self, type, value, traceback):
         """Implements TwitterClient context manager"""
-        if self.client is not None and self.client.server is not None:
-            self.client.server.connected = False
-        self.logger.debug('Exit Slack Client')
+        self.close_stream()
+        logger.debug("Exit Slack Client")
 
     def register_twitter_func(self, func):
+        """
+        Function to register a twitter func
+        once set, we can pass data to a twitterbot
+        """
         if func is not None:
             self.twitter_func = func
 
     def on_twitter_data(self, data):
+        """
+        Publish tweets to the output channel
+        """
+        self.lock.acquire()
         try:
-            self.client.rtm_send_message(
-                self.output_channel, (f"## Incoming Tweet ##\n"
-                                      f"{data['timestamp']} - "
-                                      "@{data['username']}:"
-                                      f"\n{data['text']}\n\n"))
+            self.send_message(
+                self.output_channel,
+                (
+                    "🐦🐦 Incoming Tweet 🐦🐦\n"
+                    f"@{data['username']}:"
+                    f"\n{data['text']}\n\n"
+                ),
+            )
         except Exception as e:
-            self.logger.error(f'Failed to post Twitter event to Slack:\n{e}')
+            logger.error(f"Failed to post Twitter event to Slack:\n{e}")
+        finally:
+            self.lock.release()
 
     def monitor_stream(self):
-        """ Monitor slack rtm feed for messages mentioning the bot
+        """
+        Monitor slack rtm feed for messages mentioning the bot
         if the message is an exit message,
         """
-        self.logger.info('Monitoring Slack messages...')
+        logger.info("Monitoring Slack messages...")
         while self.client.server.connected:
+            # turn on thread lock
+            self.lock.acquire()
             try:
                 events = self.client.rtm_read()
+            except WebSocketConnectionClosedException:
+                # If remote host closed the connection or some network error
+                # happened, this exception will be raised.
+                # This sometimes happens in the rtm_read() function.
+                # See https://github.com/slackapi/python-slackclient/issues/36
+                error_str = (
+                    "The Slack RTM host unexpectedly closed its"
+                    "websocket.\nRestarting ..."
+                )
+                logger.error(error_str, exc_info=True)
+                time.sleep(2)
+                continue
             except Exception as e:
-                # stream occasionally hickups, catch that error and reconnect
-                if str(e) == '[Errno 35] Resource temporarily unavailable':
-                    self.logger.warning(
-                        'Resource temporarily unavailable... Retrying...')
-                    time.sleep(0)
-                    continue
-                else:
-                    self.logger.error(f'{e}')
-            if events:
-                self.monitor_events(list(events))
-        self.logger.info('Exiting Slack Stream...')
+                logger.error(f"{e}")
+            finally:
+                self.lock.release()
+                if events:
+                    self.monitor_events(list(events))
+        logger.info("Exiting Slack Stream...")
 
     def monitor_events(self, events):
+        """
+        Monitor slack stream for messages that mention out bots name
+        and respond to them accordingly
+        """
         for event in events:
             # only look for messages that mention the bot
-            if ('message' in event.values() and
-                    'text' in event.keys() and self.id in event['text']):
-                text = event['text'].strip()
-                text_list = text.split(' ')
-                # disconnect if we get an exit message
+            if (
+                "message" in event.values()
+                and "text" in event.keys()
+                and self.id in event["text"]
+            ):
+                text = event["text"].strip()
+                text_list = text.split(" ")
+
                 if text == self.exit_command:
-                    self.logger.warning('Received Exit Message...')
-                    self.client.server.connected = False
-                # CRUD commands for twitterbot subs
+                    # disconnect if we get an exit message
+                    self.handle_exit_command(self.output_channel)
+
                 elif self.twitter_func is not None and len(text_list) > 2:
+                    # CRUD commands for twitterbot subs
                     command = text_list[1]
                     subs = text_list[2:]
-                    self.twitter_func(command, subs)
-                else:
-                        # replace mention tag with bot name and log
-                    msg = event['text'].replace(
-                        self.mentioned_string, f'@{self.name}')
+                    if command in ["update", "add", "delete"]:
+                        self.twitter_func(command, subs, self)
 
-                    self.logger.info(f'Bot was mentioned: {msg}')
-                    # send response message in chat
-                    try:
-                        self.client.rtm_send_message(
-                            self.output_channel, "Who wants Ramen or Ramlets?")
-                    except Exception as e:
-                        self.logger.error(
-                            f'Failed to send response message: {e}')
+                else:
+                    # Normal message, respond
+                    self.respond_to_mention(event)
+
+    def respond_to_mention(self, event):
+        """
+        Send a response message when bot is mentioned
+        in a normal message
+        """
+        # replace mention tag with bot name and log
+        msg = event["text"].replace(self.mentioned_string, f"@{self.name}")
+
+        logger.info(f"Bot was mentioned: {msg}")
+        # send response message in chat
+        self.send_message(self.output_channel, "Who wants Ramen or Ramlets?")
+
+    def handle_exit_command(self, channel):
+        """Send an exit message upon exiting and close the stream"""
+        logger.warning("Received Exit Message...")
+        self.send_message(channel, "Okay. Bye.")
+        self.close_stream()
+
+    def send_message(self, channel, message):
+        """
+        Send an rtm message on slack
+        """
+        try:
+            self.client.rtm_send_message(channel, message)
+        except Exception as e:
+            logger.error(f"Failed to send message: {e}")
 
     def connect_to_stream(self):
         """Continuously monitor slack events for mentions of this bot
         if exit message is received then exit gracefully
         """
-        self.logger.info(f'Connecting to Slack Stream as {self.name}...')
+        logger.info(f"Connecting to Slack Stream as {self.name}...")
         # command to listen to on slack to indicate bot is exiting
         try:
-            res = self.client.rtm_connect()
-            self.logger.info(
-                'Successfully Connected to Slack Stream!')
-        except:
-            self.logger.error("Connection to Slack Stream Failed")
+            self.client.rtm_connect()
+            logger.info("Successfully Connected to Slack Stream!")
+        except Exception as e:
+            logger.error(f"Connection to Slack Stream Failed. {e}")
+
+    def close_stream(self):
+        """Disconnect the client server"""
+        if self.client and self.client.server and self.client.server.connected:
+            try:
+                self.client.server.connected = False
+            except Exception as e:
+                logger.error(f"Tried to close stream, but it failed. {e}")
