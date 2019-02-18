@@ -51,7 +51,7 @@ class Twitterbot(tweepy.StreamListener):
         self.subscriptions = subscriptions
         self.event_list = []
         self.api = self.create_api()
-        self.slack_func = None
+
         self.slackbot = None
         self.total_events = 0
         self.events_per_min = 0

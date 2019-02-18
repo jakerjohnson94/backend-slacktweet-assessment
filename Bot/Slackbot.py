@@ -39,9 +39,12 @@ class Slackbot(object):
         self.id = SLACKBOT_ID
         self.output_channel = channel
         self.mentioned_string = f"<@{self.id}>"
-        self.slack_commands = {"exit": self.handle_exit_command}
+        self.slack_methods = {
+            "exit": self.handle_exit_command,
+            "help": self.handle_help_command,
+        }
         self.twitter_commands = ["update", "add", "delete"]
-        self.twitter_func = None
+
         self.twitterbot = None
         self.lock = threading.Lock()
         try:
@@ -129,22 +132,33 @@ class Slackbot(object):
             ):
                 text = event["text"].strip()
                 text_list = text.split(" ")
+                command = text_list[1].lower()
+                if len(text_list) == 1:
+                    self.send_message("`Yes? Please enter a valid command.`")
                 if len(text_list) == 2:
-                    command = text_list[-1].lower()
-                    if command in self.slack_commands.keys():
+                    if command in self.slack_methods.keys():
                         # call appropriate command method
-                        self.slack_commands[command]()
+                        self.slack_methods[command]()
 
-                elif self.twitterbot is not None and len(text_list) > 2:
+                elif len(text_list) > 2:
                     # CRUD commands for twitterbot subs
-                    command = text_list[1]
-                    subs = text_list[2:]
-                    if command in self.twitter_commands:
+                    if (
+                        command in self.twitter_commands
+                        and self.twitterbot is not None
+                    ):
+                        sub_str = " ".join(text_list[2:])
+                        subs = self.parse_subs(sub_str)
                         self.twitterbot.on_slack_command(command, subs, self)
 
                 # else:
                 #     # Normal message, respond
                 #     self.respond_to_mention(event)
+
+    def parse_subs(self, subs):
+        if subs.startswith("["):
+            return subs[1:-1].split(",")
+        else:
+            return subs.split(",")
 
     def respond_to_mention(self, event):
         """
@@ -163,6 +177,23 @@ class Slackbot(object):
         logger.warning("Received Exit Message...")
         self.send_message("`Shutting Down...`")
         self.close_stream()
+
+    def handle_help_command(self, *args):
+        self.send_message(
+            "```"
+            "Bobbot is an integrated Slack and Twitter Bot capable of"
+            "'Subscribing' To keywords on Twitter and publishing them to slack\n"
+            "To Interact with the bot, mention @BobBot on Slack followed by a valid command\n"
+            "*Basic Commands:*\n"
+            "*exit:* close the bot"
+            "*help:* bring up this dialogue\n\n"
+            "*Subscription Commands:*\n"
+            "_(Separate separate subscriptions by commas)_\n"
+            "*add <subscriptions>:* add new subscription(s) to the current list\n"
+            "*update <subscriptions>:* replace the current subscriptions list\n"
+            "*remove <subscriptions>:* remove subscriptions(s) from current"
+            " list```"
+        )
 
     def send_message(self, message):
         """
